@@ -18,10 +18,15 @@ import android.view.MenuItem;
 import android.view.View;
 import android.widget.Button;
 
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
 import java.io.FileDescriptor;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.UUID;
 import java.util.zip.CRC32;
@@ -31,7 +36,7 @@ public class MainActivity extends AppCompatActivity {
     private static final int WRITE_REQUEST_CODE = 43;
     private static final String TAG = "Filtranet";
 
-    private static final int BLOCK_SIZE = 1024;
+    private static final int BLOCK_LENGTH = 1024;
 
     private Button sendBtn;
     private Button recvBtn;
@@ -144,45 +149,150 @@ public class MainActivity extends AppCompatActivity {
             // todo incorporate method here and show progress
             return openFileRead(uris[0]);
         }
-    }
 
-    private class SendAsync extends AsyncTask<SFileBlock, String, String> {
         @Override
-        protected String doInBackground(SFileBlock... sFileBlocks) {
-            try {
-                FileInputStream fis;
-                for (SFileBlock block : sFileBlocks) {
-                    fis = new FileInputStream(block.sfile.fd);
-
-                    fis.skip(block.offset);
-
-                    byte[] data = new byte[block.length];
-
-                    fis.read(data, 0, block.length);
-                    // todo send
-                }
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-            return "";
+        protected void onPostExecute(SFile sFile) {
+            super.onPostExecute(sFile);
+            // todo send file metadata and then the file
         }
     }
 
-    private class SFileBlock {
-        String uid;
+    private interface SBlock {
+        void read(DataInputStream in) throws IOException;
+
+        void write(DataOutputStream out) throws IOException;
+    }
+
+    private class SFileBlock implements SBlock {
+        UUID uid;
         long offset;
-        int length;
         long crc;
+        int length;
 
         SFile sfile;
 
-        // byte[] data; // not stored to reduce ram usage
+        @Override
+        public void write(DataOutputStream out) throws IOException {
+            // todo check sfile and throw filenotfoundexception appropriately
+            byte[] data = new byte[length];
+
+            try (FileInputStream fis = new FileInputStream(sfile.fd)) {
+                fis.skip(offset);
+                fis.read(data, 0, length);
+            }
+
+            out.writeLong(uid.getMostSignificantBits());
+            out.writeLong(uid.getLeastSignificantBits());
+
+            out.writeLong(offset);
+            out.writeLong(crc);
+            out.writeLong(length);
+
+            out.write(data, 0, length);
+
+        }
+
+        @Override
+        public void read(DataInputStream in) throws IOException {
+            // todo check sfile and throw filenotfoundexception appropriately
+            uid = new UUID(in.readLong(), in.readLong());
+
+            offset = in.readLong();
+            crc = in.readLong();
+            length = in.readInt();
+
+            byte[] data = new byte[length];
+            in.read(data, 0, length);
+
+            // todo crc and accept/discard
+
+            try (FileOutputStream fos = new FileOutputStream(sfile.fd); FileChannel ch = fos.getChannel()) {
+                ch.position(offset);
+                ch.write(ByteBuffer.wrap(data));
+            }
+            // write to SFile
+        }
+    }
+
+    private class SMetaBlock implements SBlock {
+        long length;
+
+        short nameLength; // not used outside
+        short mimeTypeLength; // not used outside
+
+        String filename;
+        String mimeType;
+
+        @Override
+        public void read(DataInputStream in) throws IOException {
+            length = in.readLong();
+            nameLength = in.readShort();
+            mimeTypeLength = in.readShort();
+
+            byte[] _name = new byte[nameLength];
+            byte[] _mime = new byte[mimeTypeLength];
+
+            in.read(_name, 0, nameLength);
+            in.read(_mime, 0, mimeTypeLength);
+
+            filename = new String(_name, StandardCharsets.UTF_8);
+            mimeType = new String(_mime, StandardCharsets.UTF_8);
+        }
+
+        @Override
+        public void write(DataOutputStream out) throws IOException {
+            byte[] _name = filename.getBytes(StandardCharsets.UTF_8);
+            byte[] _mime = filename.getBytes(StandardCharsets.UTF_8);
+
+            nameLength = (short) _name.length;
+            mimeTypeLength = (short) _mime.length;
+
+            out.writeLong(length);
+            out.writeShort(nameLength);
+            out.writeShort(mimeTypeLength);
+
+            out.write(_name, 0, nameLength);
+            out.write(_mime, 0, mimeTypeLength);
+        }
+    }
+
+    private class SInfoBlock implements SBlock {
+        UUID attached_uid; // uid of the attached block
+        int info_code;
+        int messageLength; // not to be used outside of this class
+        String message;
+
+        @Override
+        public void read(DataInputStream in) throws IOException {
+            attached_uid = new UUID(in.readLong(), in.readLong());
+
+            info_code = in.readInt();
+            messageLength = in.readInt();
+
+            byte[] _msg = new byte[messageLength];
+            in.read(_msg, 0, messageLength);
+
+            message = new String(_msg, StandardCharsets.UTF_8);
+        }
+
+        @Override
+        public void write(DataOutputStream out) throws IOException {
+            out.writeLong(attached_uid.getMostSignificantBits());
+            out.writeLong(attached_uid.getLeastSignificantBits());
+
+            out.writeInt(info_code);
+
+            byte[] _msg = message.getBytes(StandardCharsets.UTF_8);
+            messageLength = _msg.length;
+
+            out.writeInt(messageLength);
+            out.write(_msg, 0, messageLength);
+
+        }
     }
 
     private class SFile {
-        long length;
-        String filename;
-        String mimeType;
+        SMetaBlock metaBlock;
 
         List<SFileBlock> blocks;
         FileDescriptor fd;
@@ -193,16 +303,17 @@ public class MainActivity extends AppCompatActivity {
 
             int bytesRead;
 
-            byte[] buffer = new byte[BLOCK_SIZE];
-
             CRC32 crc32 = new CRC32();
 
-            for (length = 0; (bytesRead = file.read(buffer, 0, BLOCK_SIZE)) != -1; length += bytesRead) {
+            metaBlock = new SMetaBlock();
+            byte[] buffer = new byte[BLOCK_LENGTH];
+
+            for (metaBlock.length = 0; (bytesRead = file.read(buffer, 0, BLOCK_LENGTH)) != -1; metaBlock.length += bytesRead) {
                 SFileBlock sblock = new SFileBlock();
 
-                sblock.uid = UUID.randomUUID().toString();
+                sblock.uid = UUID.randomUUID();
 
-                sblock.offset = length;
+                sblock.offset = metaBlock.length;
                 sblock.length = bytesRead;
 
                 crc32.update(buffer);
@@ -214,8 +325,8 @@ public class MainActivity extends AppCompatActivity {
                 blocks.add(sblock);
             }
 
-            this.filename = filename;
-            this.mimeType = mimeType;
+            this.metaBlock.filename = filename;
+            this.metaBlock.mimeType = mimeType;
         }
     }
 
