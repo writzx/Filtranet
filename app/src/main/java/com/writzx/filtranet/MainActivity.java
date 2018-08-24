@@ -25,11 +25,11 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.nio.channels.FileChannel;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
-import java.util.UUID;
-import java.util.zip.CRC32;
+import java.util.Random;
 
 public class MainActivity extends AppCompatActivity {
     private static final int READ_REQUEST_CODE = 42;
@@ -37,6 +37,12 @@ public class MainActivity extends AppCompatActivity {
     private static final String TAG = "Filtranet";
 
     private static final int BLOCK_LENGTH = 1024;
+
+    private static final Random random = new Random();
+
+    static short generateRandomUID() {
+        return (short) random.nextInt(Short.MAX_VALUE + 1);
+    }
 
     private Button sendBtn;
     private Button recvBtn;
@@ -164,9 +170,9 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private class SFileBlock implements SBlock {
-        UUID uid;
+        short uid;
         long offset;
-        long crc;
+        int crc;
         int length;
 
         SFile sfile;
@@ -181,8 +187,7 @@ public class MainActivity extends AppCompatActivity {
                 fis.read(data, 0, length);
             }
 
-            out.writeLong(uid.getMostSignificantBits());
-            out.writeLong(uid.getLeastSignificantBits());
+            out.writeShort(uid);
 
             out.writeLong(offset);
             out.writeLong(crc);
@@ -195,10 +200,10 @@ public class MainActivity extends AppCompatActivity {
         @Override
         public void read(DataInputStream in) throws IOException {
             // todo check sfile and throw filenotfoundexception appropriately
-            uid = new UUID(in.readLong(), in.readLong());
+            uid = in.readShort();
 
             offset = in.readLong();
-            crc = in.readLong();
+            crc = in.readInt();
             length = in.readInt();
 
             byte[] data = new byte[length];
@@ -216,6 +221,7 @@ public class MainActivity extends AppCompatActivity {
 
     private class SMetaBlock implements SBlock {
         long length;
+        short attached_uid; // uid of the attached uid block
 
         short nameLength; // not used outside
         short mimeTypeLength; // not used outside
@@ -226,6 +232,8 @@ public class MainActivity extends AppCompatActivity {
         @Override
         public void read(DataInputStream in) throws IOException {
             length = in.readLong();
+            attached_uid = in.readShort();
+
             nameLength = in.readShort();
             mimeTypeLength = in.readShort();
 
@@ -248,6 +256,8 @@ public class MainActivity extends AppCompatActivity {
             mimeTypeLength = (short) _mime.length;
 
             out.writeLong(length);
+            out.writeShort(attached_uid);
+
             out.writeShort(nameLength);
             out.writeShort(mimeTypeLength);
 
@@ -257,14 +267,14 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private class SInfoBlock implements SBlock {
-        UUID attached_uid; // uid of the attached block
+        short attached_uid; // uid of the attached block
         int info_code;
         int messageLength; // not to be used outside of this class
         String message;
 
         @Override
         public void read(DataInputStream in) throws IOException {
-            attached_uid = new UUID(in.readLong(), in.readLong());
+            attached_uid = in.readShort();
 
             info_code = in.readInt();
             messageLength = in.readInt();
@@ -277,8 +287,7 @@ public class MainActivity extends AppCompatActivity {
 
         @Override
         public void write(DataOutputStream out) throws IOException {
-            out.writeLong(attached_uid.getMostSignificantBits());
-            out.writeLong(attached_uid.getLeastSignificantBits());
+            out.writeShort(attached_uid);
 
             out.writeInt(info_code);
 
@@ -288,6 +297,42 @@ public class MainActivity extends AppCompatActivity {
             out.writeInt(messageLength);
             out.write(_msg, 0, messageLength);
 
+        }
+    }
+
+    private class SUIDBlock implements SBlock {
+        short uid;
+        int length; // number of bytes occupied by the next field, i.e., UIDs array.
+        short[] uids;
+        short next_uid = 0; // uid of the next uid block; same as uid if none (0)
+
+        @Override
+        public void read(DataInputStream in) throws IOException {
+            uid = in.readShort();
+            length = in.readInt();
+
+            byte[] _uids = new byte[length];
+            in.read(_uids, 0, length);
+
+            uids = new short[length / 2];
+            ByteBuffer.wrap(_uids).order(ByteOrder.LITTLE_ENDIAN).asShortBuffer().get(uids);
+
+            next_uid = in.readShort();
+        }
+
+        @Override
+        public void write(DataOutputStream out) throws IOException {
+            out.writeShort(uid);
+            length = uids.length * 2;
+            out.writeInt(length);
+
+            byte[] _uids = new byte[length];
+            ByteBuffer.wrap(_uids).order(ByteOrder.LITTLE_ENDIAN).asShortBuffer().put(uids);
+
+            out.write(_uids, 0, length);
+
+            if (next_uid == 0) next_uid = uid;
+            out.write(next_uid);
         }
     }
 
@@ -303,7 +348,7 @@ public class MainActivity extends AppCompatActivity {
 
             int bytesRead;
 
-            CRC32 crc32 = new CRC32();
+            CRC16 crc = new CRC16();
 
             metaBlock = new SMetaBlock();
             byte[] buffer = new byte[BLOCK_LENGTH];
@@ -311,14 +356,14 @@ public class MainActivity extends AppCompatActivity {
             for (metaBlock.length = 0; (bytesRead = file.read(buffer, 0, BLOCK_LENGTH)) != -1; metaBlock.length += bytesRead) {
                 SFileBlock sblock = new SFileBlock();
 
-                sblock.uid = UUID.randomUUID();
+                sblock.uid = generateRandomUID();
 
                 sblock.offset = metaBlock.length;
                 sblock.length = bytesRead;
 
-                crc32.update(buffer);
-                sblock.crc = crc32.getValue();
-                crc32.reset();
+                crc.update(buffer, 0, buffer.length);
+                sblock.crc = (short) crc.getValue();
+                crc.reset();
 
                 sblock.sfile = this;
 
