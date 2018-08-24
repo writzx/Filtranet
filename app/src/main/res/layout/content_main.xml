@@ -10,12 +10,19 @@
 
     <EditText
         android:id="@+id/ipAddress"
-        android:layout_width="match_parent"
+        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintLeft_toLeftOf="parent"
-        app:layout_constraintRight_toRightOf="parent"
-        android:hint="Enter ip address with port <ip:port>" />
+        app:layout_constraintRight_toLeftOf="@id/initBtn"
+        android:hint="Enter ip address with port (ip:port)" />
+
+    <Button
+        android:id="@+id/initBtn"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        app:layout_constraintLeft_toRightOf="@id/ipAddress"
+        android:text="init" />
 
     <Button
         android:id="@+id/sendFile"
