@@ -172,7 +172,7 @@ public class MainActivity extends AppCompatActivity {
     private class SFileBlock implements SBlock {
         short uid;
         long offset;
-        int crc;
+        short crc;
         int length;
 
         SFile sfile;
@@ -190,32 +190,49 @@ public class MainActivity extends AppCompatActivity {
             out.writeShort(uid);
 
             out.writeLong(offset);
-            out.writeLong(crc);
+            out.writeShort(crc);
             out.writeLong(length);
 
             out.write(data, 0, length);
-
         }
 
         @Override
         public void read(DataInputStream in) throws IOException {
-            // todo check sfile and throw filenotfoundexception appropriately
             uid = in.readShort();
 
             offset = in.readLong();
-            crc = in.readInt();
+            crc = in.readShort();
             length = in.readInt();
 
             byte[] data = new byte[length];
             in.read(data, 0, length);
 
-            // todo crc and accept/discard
-
-            try (FileOutputStream fos = new FileOutputStream(sfile.fd); FileChannel ch = fos.getChannel()) {
-                ch.position(offset);
-                ch.write(ByteBuffer.wrap(data));
+            // todo check sfile
+            // todo if sfile is not available
+            // todo    save to temp block file and enqueue as temp block
+            // todo else
+            // todo    save to sfile
+            if (valid(data)) {
+                // the data is valid
+                // write to SFile
+                try (FileOutputStream fos = new FileOutputStream(sfile.fd); FileChannel ch = fos.getChannel()) {
+                    ch.position(offset);
+                    ch.write(ByteBuffer.wrap(data));
+                }
+            } else {
+                // the data is invalid todo throw exception
             }
-            // write to SFile
+        }
+
+        private boolean valid(byte[] data) {
+            if (uid == 0 || offset < 0 || length < offset || length != data.length) {
+                return false;
+            }
+
+            CRC16 crc16 = new CRC16();
+            crc16.update(data, 0, data.length);
+
+            return crc16.getShortValue() == crc;
         }
     }
 
@@ -362,7 +379,7 @@ public class MainActivity extends AppCompatActivity {
                 sblock.length = bytesRead;
 
                 crc.update(buffer, 0, buffer.length);
-                sblock.crc = (short) crc.getValue();
+                sblock.crc = crc.getShortValue();
                 crc.reset();
 
                 sblock.sfile = this;

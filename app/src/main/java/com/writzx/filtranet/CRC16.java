@@ -47,6 +47,10 @@ public class CRC16 implements Checksum {
         return sum;
     }
 
+    public short getShortValue() {
+        return (short) sum;
+    }
+
     @Override
     public void reset() {
         sum = 0xFFFF;
