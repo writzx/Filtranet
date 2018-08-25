@@ -1,15 +1,13 @@
 package com.writzx.filtranet;
 
 import android.app.Activity;
-import android.content.ContentResolver;
 import android.content.Context;
 import android.content.Intent;
-import android.database.Cursor;
 import android.net.Uri;
-import android.os.AsyncTask;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Message;
 import android.os.ParcelFileDescriptor;
-import android.provider.OpenableColumns;
 import android.support.design.widget.FloatingActionButton;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
@@ -17,28 +15,40 @@ import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
-import android.widget.Button;
-import android.widget.EditText;
+import android.widget.TextView;
 
-import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.lang.ref.WeakReference;
+import java.util.Locale;
 
 public class MainActivity extends AppCompatActivity {
     private static final int READ_REQUEST_CODE = 42;
     private static final int WRITE_REQUEST_CODE = 43;
+
+    private static final int PROGRESS_MSG = 0xffff;
+
     private static final String TAG = "Filtranet";
 
     public static WeakReference<Context> context;
 
-    private Button sendBtn;
-    private Button recvBtn;
-    private Button init;
-    private EditText ipAddress;
+    public TextView console;
 
-    public MainActivity() {
+    public class ProgressHandler extends Handler {
+        String status;
+        int bytesRead;
+        int totalBytes;
+
+        @Override
+        public void handleMessage(Message msg) {
+            removeMessages(PROGRESS_MSG);
+
+            float percent = bytesRead / totalBytes;
+            console.setText(String.format(Locale.ENGLISH, "Status: %s;   %d/%d;   %.2f\n", status, bytesRead, totalBytes, 100 * percent));
+        }
     }
+
+    public ProgressHandler progressHandler = new ProgressHandler();
 
     public void selectFileRead() {
         Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
@@ -72,49 +82,14 @@ public class MainActivity extends AppCompatActivity {
             public void onClick(View view) {
 //                selectFileWrite("fuckingFile.txt");
 //                selectFileRead();
+
+                selectFileRead();
             }
         });
 
-        sendBtn = findViewById(R.id.sendFile);
-        recvBtn = findViewById(R.id.recvFile);
-        ipAddress = findViewById(R.id.ipAddress);
-        init = findViewById(R.id.initBtn);
+        console = findViewById(R.id.console);
 
         context = new WeakReference<>((Context) this);
-
-        init.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-
-            }
-        });
-
-        sendBtn.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-
-            }
-        });
-
-        recvBtn.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                new RecvTask().execute();
-            }
-        });
-    }
-
-    private class RecvTask extends AsyncTask<Void, Void, CFileBlock> {
-
-        @Override
-        protected CFileBlock doInBackground(Void... voids) {
-            return null;
-        }
-
-        @Override
-        protected void onPostExecute(CFileBlock s) {
-            super.onPostExecute(s);
-        }
     }
 
     @Override
@@ -148,7 +123,35 @@ public class MainActivity extends AppCompatActivity {
                     if (resultData != null) {
                         uri = resultData.getData();
                         // Log.i(TAG, "Uri: " + uri.toString());
-                        new PrepFile().execute(uri);
+                        final FileProcessor proc = new FileProcessor();
+
+                        proc.listener = new FileProcessor.Listener() {
+                            @Override
+                            public void init() {
+                                console.append("Initializing...\n");
+                            }
+
+                            @Override
+                            public void complete(CFile file) {
+                                console.append("Complete\n");
+                            }
+
+                            @Override
+                            public void reportProgress(String status, int bytesRead, int totalBytes) {
+                                progressHandler.status = status;
+                                progressHandler.bytesRead = bytesRead;
+                                progressHandler.totalBytes = totalBytes;
+
+                                progressHandler.sendEmptyMessage(PROGRESS_MSG);
+                            }
+
+                            @Override
+                            public void cancel() {
+
+                            }
+                        };
+
+                        proc.execute(uri);
                     }
                 }
                 break;
@@ -163,63 +166,6 @@ public class MainActivity extends AppCompatActivity {
                 }
                 break;
         }
-    }
-
-    private class PrepFile extends AsyncTask<Uri, String, CFile> {
-        @Override
-        protected CFile doInBackground(Uri... uris) {
-            // todo incorporate method here and show progress
-            return openFileRead(uris[0]);
-        }
-
-        @Override
-        protected void onPostExecute(CFile cFile) {
-            super.onPostExecute(cFile);
-            // todo send file metadata and then the file
-        }
-    }
-
-    CFile openFileRead(Uri uri) {
-        ContentResolver resolver = getContentResolver();
-        Cursor cursor = resolver.query(uri, null, null, null, null, null);
-
-        try {
-            if (cursor != null && cursor.moveToFirst()) {
-                String displayName = cursor.getString(cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME));
-
-                ParcelFileDescriptor pfd = resolver.openFileDescriptor(uri, "r");
-                if (pfd == null) {
-                    return null;
-                }
-                FileInputStream fis = new FileInputStream(pfd.getFileDescriptor());
-
-                return new CFile(fis, displayName, resolver.getType(uri));
-            } else {
-                Log.e(TAG, "URI Error: Could not resolve cursor!");
-                return null;
-            }
-        } catch (IOException ex) {
-            Log.e(TAG, "URI Error: Could not resolve stream!");
-            return null;
-        } finally {
-            cursor.close();
-        }
-
-//        BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream));
-//        StringBuilder stringBuilder = new StringBuilder();
-//        String line;
-//        try {
-//            while ((line = reader.readLine()) != null) {
-//                stringBuilder.append(line);
-//            }
-//            inputStream.close();
-//        } catch (IOException ex) {
-//            Log.e(TAG, "File Error: Could not open file!");
-//            return;
-//        }
-//        // return stringBuilder.toString();
-//
-//        Log.i(TAG, "File Data: " + stringBuilder.toString());
     }
 
     FileOutputStream openFileWrite(Uri uri) {
