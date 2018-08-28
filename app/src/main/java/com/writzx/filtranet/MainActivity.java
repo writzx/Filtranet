@@ -4,79 +4,74 @@ import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
+import android.os.AsyncTask;
 import android.os.Bundle;
-import android.os.Handler;
-import android.os.Message;
 import android.os.ParcelFileDescriptor;
+import android.support.annotation.IntDef;
 import android.support.design.widget.FloatingActionButton;
+import android.support.design.widget.Snackbar;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
-import android.widget.TextView;
+import android.widget.ListView;
+
+import com.ipaulpro.afilechooser.utils.FileUtils;
 
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
 import java.lang.ref.WeakReference;
-import java.util.Locale;
+import java.util.ArrayList;
 
 public class MainActivity extends AppCompatActivity {
     private static final int READ_REQUEST_CODE = 42;
     private static final int WRITE_REQUEST_CODE = 43;
 
-    private static final int PROGRESS_MSG = 0xffff;
+//    private static final int RC_OPEN_READ = 2;
+//    private static final int RC_OPEN_WRITE = 2;
+//    private static final String LAST_RETURNED_DOCUMENT_URI = "LAST_RETURNED_DOCUMENT_URI";
+//    private static final String LAST_RETURNED_DOCUMENT_TREE_URI = "LAST_RETURNED_DOCUMENT_TREE_URI";
+
+    @IntDef({INDEFINITE_SNACK, SHORT_SNACK, LONG_SNACK})
+    @Retention(RetentionPolicy.SOURCE)
+    public @interface Duration {
+    }
+
+    public static final int INDEFINITE_SNACK = Snackbar.LENGTH_INDEFINITE;
+    public static final int SHORT_SNACK = Snackbar.LENGTH_SHORT;
+    public static final int LONG_SNACK = Snackbar.LENGTH_LONG;
+
 
     private static final String TAG = "Filtranet";
 
     public static WeakReference<Context> context;
 
-    public TextView console;
+    public ListView fileListView;
 
-    public class ProgressHandler extends Handler {
-        String status;
-        int bytesRead;
-        int totalBytes;
-
-        @Override
-        public void handleMessage(Message msg) {
-            removeMessages(PROGRESS_MSG);
-
-            float percent = bytesRead / totalBytes;
-            console.setText(String.format(Locale.ENGLISH, "Status: %s;   %d/%d;   %.2f\n", status, bytesRead, totalBytes, 100 * percent));
-        }
-    }
-
-    public ProgressHandler progressHandler = new ProgressHandler();
+    public static FileItemAdapter adapter;
 
     public void selectFileRead() {
-        Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
-        intent.addCategory(Intent.CATEGORY_OPENABLE);
-
-        intent.setType("*/*");
-
-        startActivityForResult(intent, READ_REQUEST_CODE);
+        startActivityForResult(FileUtils.createOpenDocumentIntent(), READ_REQUEST_CODE);
     }
 
     private void selectFileWrite(String fileName) {
-        Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT);
-        intent.addCategory(Intent.CATEGORY_OPENABLE);
-
-        // todo mime type
-        intent.setType("text/plain");
-        intent.putExtra(Intent.EXTRA_TITLE, fileName);
-        startActivityForResult(intent, WRITE_REQUEST_CODE);
+        startActivityForResult(FileUtils.createOpenDocumentIntent(fileName), WRITE_REQUEST_CODE);
     }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-        Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
+        Toolbar toolbar = findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
 
         FloatingActionButton fab = findViewById(R.id.fab);
+        fileListView = findViewById(R.id.fileListView);
+
         fab.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
@@ -87,9 +82,15 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
-        console = findViewById(R.id.console);
+        // console = findViewById(R.id.console);
 
         context = new WeakReference<>((Context) this);
+
+        adapter = new FileItemAdapter(this, new ArrayList<ListItem>());
+
+        fileListView.setAdapter(adapter);
+
+        showSnackbar("SOMETHING TO SHOW", LONG_SNACK);
     }
 
     @Override
@@ -115,43 +116,16 @@ public class MainActivity extends AppCompatActivity {
     }
 
     @Override
-    public void onActivityResult(int requestCode, int resultCode, Intent resultData) {
+    public void onActivityResult(int requestCode, int resultCode, final Intent resultData) {
         switch (requestCode) {
             case READ_REQUEST_CODE:
                 if (resultCode == Activity.RESULT_OK) {
                     Uri uri = null;
                     if (resultData != null) {
                         uri = resultData.getData();
-                        // Log.i(TAG, "Uri: " + uri.toString());
-                        final FileProcessor proc = new FileProcessor();
 
-                        proc.listener = new FileProcessor.Listener() {
-                            @Override
-                            public void init() {
-                                console.append("Initializing...\n");
-                            }
-
-                            @Override
-                            public void complete(CFile file) {
-                                console.append("Complete\n");
-                            }
-
-                            @Override
-                            public void reportProgress(String status, int bytesRead, int totalBytes) {
-                                progressHandler.status = status;
-                                progressHandler.bytesRead = bytesRead;
-                                progressHandler.totalBytes = totalBytes;
-
-                                progressHandler.sendEmptyMessage(PROGRESS_MSG);
-                            }
-
-                            @Override
-                            public void cancel() {
-
-                            }
-                        };
-
-                        proc.execute(uri);
+                        FileProcessor fp1 = new FileProcessor(uri);
+                        fp1.executeOnExecutor(AsyncTask.SERIAL_EXECUTOR);
                     }
                 }
                 break;
@@ -166,6 +140,12 @@ public class MainActivity extends AppCompatActivity {
                 }
                 break;
         }
+    }
+
+    public static void showSnackbar(String msg, @Duration int duration) {
+        View listView = ((Activity) MainActivity.context.get()).getWindow().getDecorView().findViewById(android.R.id.content).findViewById(R.id.fab);
+
+        Snackbar.make(listView, msg, Snackbar.LENGTH_LONG).show();
     }
 
     FileOutputStream openFileWrite(Uri uri) {

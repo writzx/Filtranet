@@ -6,7 +6,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 
 class CMetaBlock extends CBlock {
-    long length;
+    int length;
     short attached_uid; // uid of the attached uid block
 
     short nameLength; // not used outside
@@ -17,7 +17,7 @@ class CMetaBlock extends CBlock {
 
     @Override
     public void read(DataInputStream in) throws IOException {
-        length = in.readLong();
+        length = in.readInt();
         attached_uid = in.readShort();
 
         nameLength = in.readShort();
@@ -41,7 +41,7 @@ class CMetaBlock extends CBlock {
         nameLength = (short) _name.length;
         mimeTypeLength = (short) _mime.length;
 
-        out.writeLong(length);
+        out.writeInt(length);
         out.writeShort(attached_uid);
 
         out.writeShort(nameLength);

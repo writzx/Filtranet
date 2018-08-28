@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="utf-8"?>
+<android.support.constraint.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:padding="8dp">
+
+    <LinearLayout
+        android:id="@+id/fileIconLL"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:padding="8dp">
+
+        <ImageView
+            android:id="@+id/fileIcon"
+            android:layout_width="64dp"
+            android:layout_height="64dp"
+            android:src="@android:color/darker_gray" />
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/fileName"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:textSize="16sp"
+        app:layout_constraintLeft_toRightOf="@+id/fileIconLL"
+        app:layout_constraintTop_toTopOf="@+id/fileIconLL"
+        tools:text="something.png"
+        android:layout_marginStart="0dp"
+        app:layout_constraintRight_toRightOf="parent"
+        android:singleLine="true"
+        android:ellipsize="middle"
+        android:layout_marginEnd="8dp" />
+
+    <TextView
+        android:id="@+id/fileSize"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textColor="@android:color/darker_gray"
+        android:textSize="12sp"
+        app:layout_constraintLeft_toLeftOf="@id/fileName"
+        app:layout_constraintTop_toBottomOf="@id/fileType"
+        tools:text="2 MB" />
+
+    <TextView
+        android:id="@+id/filePath"
+        android:layout_width="0dp"
+        android:layout_height="20dp"
+        android:ellipsize="middle"
+        android:singleLine="true"
+        android:textColor="@android:color/darker_gray"
+        android:textSize="12sp"
+        app:layout_constraintLeft_toLeftOf="@+id/fileName"
+        app:layout_constraintRight_toRightOf="@id/fileName"
+        app:layout_constraintTop_toBottomOf="@+id/fileName"
+        tools:text="/storage/emulated/0/something.png" />
+
+    <TextView
+        android:id="@+id/fileType"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textColor="@android:color/darker_gray"
+        android:textSize="12sp"
+        app:layout_constraintLeft_toLeftOf="@+id/fileName"
+        app:layout_constraintTop_toBottomOf="@+id/filePath"
+        tools:text="image/png" />
+
+    <TextView
+        android:id="@+id/dateAdded"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textColor="@android:color/darker_gray"
+        android:textSize="12sp"
+        app:layout_constraintRight_toRightOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent"
+        tools:text="21 August 2018"
+        android:layout_marginBottom="4dp"
+        android:layout_marginEnd="4dp" />
+</android.support.constraint.ConstraintLayout>

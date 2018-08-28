@@ -1,38 +1,35 @@
 package com.writzx.filtranet;
 
 import android.content.ContentResolver;
-import android.database.Cursor;
 import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.ParcelFileDescriptor;
-import android.provider.OpenableColumns;
 import android.util.Log;
 
+import com.ipaulpro.afilechooser.utils.FileUtils;
+
+import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 
-public class FileProcessor extends AsyncTask<Uri, String, CFile> {
+public class FileProcessor extends AsyncTask<Void, String, FileListItem> {
     private static final String TAG = "FileProcessor";
+    public Uri uri;
+    public int index;
+    public long startTime;
 
-    public interface Listener {
-        void init();
-
-        void complete(CFile file);
-
-        void reportProgress(String status, int bytesRead, int totalBytes);
-
-        void cancel();
+    public FileProcessor(Uri uri) {
+        this.uri = uri;
     }
 
-    public Listener listener = null;
-
-
     @Override
-    protected CFile doInBackground(Uri... uris) {
-        Uri uri = uris[0]; // process only the first uri
+    protected FileListItem doInBackground(Void... voids) {
+        if (isCancelled()) return null;
 
         ContentResolver resolver = MainActivity.context.get().getContentResolver();
         CRC16 crc = new CRC16();
+
+        startTime = System.currentTimeMillis();
 
         try {
             ParcelFileDescriptor pfd = resolver.openFileDescriptor(uri, "r");
@@ -43,18 +40,19 @@ public class FileProcessor extends AsyncTask<Uri, String, CFile> {
             int totalLen = fis.available();
 
             CFile cfile = new CFile(fis.getFD());
-            CMetaBlock metaBlock = new CMetaBlock();
 
-            int bytesRead;
+            int bytesRead, len;
 
             byte[] buffer = new byte[CBlock.BLOCK_LENGTH];
 
-            for (metaBlock.length = 0; (bytesRead = fis.read(buffer, 0, CBlock.BLOCK_LENGTH)) != -1; metaBlock.length += bytesRead) {
+            // todo generate UID blocks inside the loop (also enqueue the blocks)
+
+            for (len = 0; (bytesRead = fis.read(buffer, 0, CBlock.BLOCK_LENGTH)) != -1 && !isCancelled(); len += bytesRead) {
                 CFileBlock cblock = new CFileBlock();
 
                 cblock.uid = UID.generate();
 
-                cblock.offset = metaBlock.length;
+                cblock.offset = len;
                 cblock.length = bytesRead;
 
                 crc.update(buffer, 0, buffer.length);
@@ -65,83 +63,76 @@ public class FileProcessor extends AsyncTask<Uri, String, CFile> {
 
                 cfile.blocks.add(cblock);
 
-                publishProgress("Reading file into chunks...", "" + metaBlock.length, "" + totalLen);
+                publishProgress("" + len, "" + totalLen);
             }
 
-            metaBlock.filename = getFileName(resolver, uri);
-            metaBlock.mimeType = resolver.getType(uri);
-
-            return cfile;
+            return isCancelled() ? null : new FileListItem(cfile, uri, totalLen);
         } catch (IOException ex) {
             Log.e(TAG, "URI Error: Could not resolve stream!");
             return null;
         }
     }
 
-    public String getFileName(ContentResolver resolver, Uri uri) {
-        String result = null;
-        if (uri.getScheme().equals("content")) {
-            try (Cursor cursor = resolver.query(uri, null, null, null, null)) {
-                if (cursor != null && cursor.moveToFirst()) {
-                    result = cursor.getString(cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME));
-                }
-            }
-        }
-        if (result == null) {
-            result = uri.getPath();
-            int cut = result.lastIndexOf('/');
-            if (cut != -1) {
-                result = result.substring(cut + 1);
-            }
-        }
-        return result;
-    }
-
     @Override
     protected void onPreExecute() {
         super.onPreExecute();
-        if (listener != null) {
-            listener.init();
-        }
-    }
 
-    @Override
-    protected void onPostExecute(CFile cFile) {
-        super.onPostExecute(cFile);
+        File f = FileUtils.getFile(MainActivity.context.get(), uri);
 
-        if (listener != null) {
-            listener.complete(cFile);
+        // cancel the task as it already exists
+        if (MainActivity.adapter.contains(f.getAbsolutePath())) {
+            MainActivity.showSnackbar("Unable to add file!\nAlready present in the list!", MainActivity.LONG_SNACK);
+
+            cancel(true);
+            return;
         }
+
+        ProgressListItem p = new ProgressListItem(f.getName(), f.getAbsolutePath());
+        p.setStatus("Initializing...");
+
+        index = MainActivity.adapter.getCount();
+        MainActivity.adapter.insert(p, index);
     }
 
     @Override
     protected void onProgressUpdate(String... values) {
         super.onProgressUpdate(values);
 
-        if (values.length == 3 && listener != null) {
-            String status = values[0];
-            int byteRead = Integer.valueOf(values[1]);
-            int total = Integer.valueOf(values[2]);
+        if (values.length == 2) {
+            int byteRead = Integer.valueOf(values[0]);
+            int total = Integer.valueOf(values[1]);
 
-            listener.reportProgress(status, byteRead, total);
+            ProgressListItem p = (ProgressListItem) MainActivity.adapter.getItem(index);
+
+            if (p != null) {
+                p.setStatus("Processing...");
+                p.setBytesRead(byteRead);
+                p.setTotalLength(total);
+            }
+
+            MainActivity.adapter.notifyDataSetChanged();
         }
     }
 
     @Override
-    protected void onCancelled(CFile cFile) {
-        super.onCancelled(cFile);
+    protected void onPostExecute(FileListItem fileListItem) {
+        super.onPostExecute(fileListItem);
+        long elapsed = System.currentTimeMillis() - startTime;
 
-        if (listener != null) {
-            listener.cancel();
-        }
-    }
+        int totalBytes = fileListItem.getFileSize();
 
-    @Override
-    protected void onCancelled() {
-        super.onCancelled();
+        ListItem litem = MainActivity.adapter.getItem(index);
+        if (litem != null) {
+            ProgressListItem pcitem = (ProgressListItem) litem;
+            pcitem.setBytesRead(totalBytes);
+            pcitem.setTotalLength(totalBytes);
 
-        if (listener != null) {
-            listener.cancel();
+            pcitem.setStatus("Complete.");
+
+            MainActivity.adapter.remove(pcitem);
+            MainActivity.adapter.insert(fileListItem, index);
+
+            Log.e(TAG, "ELAPSED TIME: " + elapsed);
         }
     }
 }
