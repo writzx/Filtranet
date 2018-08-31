@@ -12,21 +12,25 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 
-public class FileProcessor extends AsyncTask<Void, String, FileListItem> {
+public class FileProcessor extends AsyncTask<Void, Integer, FileListItem> {
     private static final String TAG = "FileProcessor";
-    public Uri uri;
-    public int index;
-    public long startTime;
+    private Uri uri;
+    private int index;
+    private long startTime;
 
-    public FileProcessor(Uri uri) {
+    private FileProcessor(Uri uri) {
         this.uri = uri;
+    }
+
+    public static FileProcessor create(Uri uri) {
+        return new FileProcessor(uri);
     }
 
     @Override
     protected FileListItem doInBackground(Void... voids) {
         if (isCancelled()) return null;
 
-        ContentResolver resolver = MainActivity.context.get().getContentResolver();
+        ContentResolver resolver = FileListActivity.context.get().getContentResolver();
         CRC16 crc = new CRC16();
 
         startTime = System.currentTimeMillis();
@@ -45,8 +49,6 @@ public class FileProcessor extends AsyncTask<Void, String, FileListItem> {
 
             byte[] buffer = new byte[CBlock.BLOCK_LENGTH];
 
-            // todo generate UID blocks inside the loop (also enqueue the blocks)
-
             for (len = 0; (bytesRead = fis.read(buffer, 0, CBlock.BLOCK_LENGTH)) != -1 && !isCancelled(); len += bytesRead) {
                 CFileBlock cblock = new CFileBlock();
 
@@ -61,9 +63,9 @@ public class FileProcessor extends AsyncTask<Void, String, FileListItem> {
 
                 cblock.cfile = cfile;
 
-                cfile.blocks.add(cblock);
+                cfile.addBlock(cblock);
 
-                publishProgress("" + len, "" + totalLen);
+                publishProgress(len, totalLen);
             }
 
             return isCancelled() ? null : new FileListItem(cfile, uri, totalLen);
@@ -77,32 +79,38 @@ public class FileProcessor extends AsyncTask<Void, String, FileListItem> {
     protected void onPreExecute() {
         super.onPreExecute();
 
-        File f = FileUtils.getFile(MainActivity.context.get(), uri);
+        // check if file permissions are present
+        try {
+            File f = FileUtils.getFile(FileListActivity.context.get(), uri);
 
-        // cancel the task as it already exists
-        if (MainActivity.adapter.contains(f.getAbsolutePath())) {
-            MainActivity.showSnackbar("Unable to add file!\nAlready present in the list!", MainActivity.LONG_SNACK);
+            // cancel the task as it already exists
+            if (FileListActivity.adapter.contains(f.getAbsolutePath())) {
+                FileListActivity.showSnackbar("Unable to add file!\nAlready present in the list!", FileListActivity.LONG_SNACK);
 
+                cancel(true);
+                return;
+            }
+
+            ProgressListItem p = new ProgressListItem(f.getName(), f.getAbsolutePath());
+            p.setStatus("Initializing...");
+
+            index = FileListActivity.adapter.getCount();
+            FileListActivity.adapter.insert(p, index);
+        } catch (SecurityException se) {
             cancel(true);
-            return;
+            FileListActivity.showSnackbar("Could not load file from chooser, use a different file provider.", FileListActivity.LONG_SNACK);
         }
-
-        ProgressListItem p = new ProgressListItem(f.getName(), f.getAbsolutePath());
-        p.setStatus("Initializing...");
-
-        index = MainActivity.adapter.getCount();
-        MainActivity.adapter.insert(p, index);
     }
 
     @Override
-    protected void onProgressUpdate(String... values) {
+    protected void onProgressUpdate(Integer... values) {
         super.onProgressUpdate(values);
 
         if (values.length == 2) {
-            int byteRead = Integer.valueOf(values[0]);
-            int total = Integer.valueOf(values[1]);
+            int byteRead = values[0];
+            int total = values[1];
 
-            ProgressListItem p = (ProgressListItem) MainActivity.adapter.getItem(index);
+            ProgressListItem p = (ProgressListItem) FileListActivity.adapter.getItem(index);
 
             if (p != null) {
                 p.setStatus("Processing...");
@@ -110,7 +118,7 @@ public class FileProcessor extends AsyncTask<Void, String, FileListItem> {
                 p.setTotalLength(total);
             }
 
-            MainActivity.adapter.notifyDataSetChanged();
+            FileListActivity.adapter.notifyDataSetChanged();
         }
     }
 
@@ -121,7 +129,7 @@ public class FileProcessor extends AsyncTask<Void, String, FileListItem> {
 
         int totalBytes = fileListItem.getFileSize();
 
-        ListItem litem = MainActivity.adapter.getItem(index);
+        ListItem litem = FileListActivity.adapter.getItem(index);
         if (litem != null) {
             ProgressListItem pcitem = (ProgressListItem) litem;
             pcitem.setBytesRead(totalBytes);
@@ -129,8 +137,8 @@ public class FileProcessor extends AsyncTask<Void, String, FileListItem> {
 
             pcitem.setStatus("Complete.");
 
-            MainActivity.adapter.remove(pcitem);
-            MainActivity.adapter.insert(fileListItem, index);
+            FileListActivity.adapter.remove(pcitem);
+            FileListActivity.adapter.insert(fileListItem, index);
 
             Log.e(TAG, "ELAPSED TIME: " + elapsed);
         }

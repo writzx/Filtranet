@@ -8,9 +8,29 @@
     tools:context=".MainActivity"
     tools:showIn="@layout/activity_main">
 
-    <ListView
-        android:id="@+id/fileListView"
+    <EditText
+        android:id="@+id/ipAddress"
         android:layout_width="match_parent"
-        android:layout_height="match_parent" />
+        android:layout_height="wrap_content"
+        android:hint="IP Address"
+        android:inputType="textVisiblePassword" />
+
+    <Button
+        android:id="@+id/sendFile"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        app:layout_constraintLeft_toLeftOf="parent"
+        app:layout_constraintRight_toLeftOf="@+id/recvFile"
+        app:layout_constraintTop_toBottomOf="@+id/ipAddress"
+        android:text="send" />
+
+    <Button
+        android:id="@+id/recvFile"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        app:layout_constraintLeft_toRightOf="@+id/sendFile"
+        app:layout_constraintTop_toBottomOf="@+id/ipAddress"
+        app:layout_constraintRight_toRightOf="parent"
+        android:text="receive" />
 
 </android.support.constraint.ConstraintLayout>

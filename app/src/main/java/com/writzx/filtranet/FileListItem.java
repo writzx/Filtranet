@@ -28,7 +28,7 @@ public class FileListItem implements ListItem {
     public static final SimpleDateFormat dateformat = new SimpleDateFormat("d MMMM yyyy", Locale.getDefault());
 
     public FileListItem(Uri uri, int filesize, Uri iconUri) {
-        File file = FileUtils.getFile(MainActivity.context.get(), uri);
+        File file = FileUtils.getFile(FileListActivity.context.get(), uri);
 
         this.file = null;
         this.uri = uri;
@@ -45,7 +45,7 @@ public class FileListItem implements ListItem {
     }
 
     public FileListItem(CFile cfile, Uri uri, int filesize, Uri iconUri) {
-        File file = FileUtils.getFile(MainActivity.context.get(), uri);
+        File file = FileUtils.getFile(FileListActivity.context.get(), uri);
 
         this.file = cfile;
         this.uri = uri;
@@ -62,7 +62,7 @@ public class FileListItem implements ListItem {
     }
 
     public FileListItem(CFile cfile, Uri uri, int filesize) {
-        File file = FileUtils.getFile(MainActivity.context.get(), uri);
+        File file = FileUtils.getFile(FileListActivity.context.get(), uri);
 
         this.file = cfile;
         this.uri = uri;
@@ -109,23 +109,23 @@ public class FileListItem implements ListItem {
     public void generateThumb() {
 
         if (iconUri != null) {
-            icon = BitmapDrawable.createFromPath(FileUtils.getPath(MainActivity.context.get(), iconUri));
+            icon = BitmapDrawable.createFromPath(FileUtils.getPath(FileListActivity.context.get(), iconUri));
         }
 
         // get thumbnail
         if (icon == null) {
-            icon = FileUtils.getThumbnail(MainActivity.context.get(), uri);
+            icon = FileUtils.getThumbnail(FileListActivity.context.get(), uri);
             // todo save and set iconUri
         }
 
         // get icon
         if (icon == null) {
-            icon = FileUtils.getIcon(MainActivity.context.get(), uri, mimetype);
+            icon = FileUtils.getIcon(FileListActivity.context.get(), uri, mimetype);
         }
 
         // get default unknown file icon
         if (icon == null) {
-            icon = ResourcesCompat.getDrawable(MainActivity.context.get().getResources(), R.drawable.ic_unknown_file, null);
+            icon = ResourcesCompat.getDrawable(FileListActivity.context.get().getResources(), R.drawable.ic_unknown_file, null);
         }
     }
 

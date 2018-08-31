@@ -35,9 +35,6 @@ import android.provider.MediaStore;
 import android.util.Log;
 import android.webkit.MimeTypeMap;
 
-import com.ianhanniballake.localstorage.LocalStorageProvider;
-import com.writzx.filtranet.BuildConfig;
-
 import java.io.File;
 import java.io.FileFilter;
 import java.text.DecimalFormat;
@@ -169,15 +166,6 @@ public class FileUtils {
 
     /**
      * @param uri The Uri to check.
-     * @return Whether the Uri authority is {@link LocalStorageProvider}.
-     * @author paulburke
-     */
-    public static boolean isLocalStorageDocument(Uri uri) {
-        return BuildConfig.DOCUMENTS_AUTHORITY.equals(uri.getAuthority());
-    }
-
-    /**
-     * @param uri The Uri to check.
      * @return Whether the Uri authority is ExternalStorageProvider.
      * @author paulburke
      */
@@ -232,8 +220,7 @@ public class FileUtils {
         };
 
         try {
-            cursor = context.getContentResolver().query(uri, projection, selection, selectionArgs,
-                    null);
+            cursor = context.getContentResolver().query(uri, projection, selection, selectionArgs, null);
             if (cursor != null && cursor.moveToFirst()) {
                 if (DEBUG)
                     DatabaseUtils.dumpCursor(cursor);
@@ -279,13 +266,8 @@ public class FileUtils {
 
         // DocumentProvider
         if (isKitKat && DocumentsContract.isDocumentUri(context, uri)) {
-            // LocalStorageProvider
-            if (isLocalStorageDocument(uri)) {
-                // The path is the id
-                return DocumentsContract.getDocumentId(uri);
-            }
             // ExternalStorageProvider
-            else if (isExternalStorageDocument(uri)) {
+            if (isExternalStorageDocument(uri)) {
                 final String docId = DocumentsContract.getDocumentId(uri);
                 final String[] split = docId.split(":");
                 final String type = split[0];
@@ -550,6 +532,10 @@ public class FileUtils {
 
     public static Intent createOpenDocumentIntent() {
         final Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+
+        intent.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true);
+        intent.putExtra(Intent.EXTRA_LOCAL_ONLY, true);
+        intent.putExtra("android.content.extra.SHOW_ADVANCED", true);
 
         intent.setType("*/*");
 

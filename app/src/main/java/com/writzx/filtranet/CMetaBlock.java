@@ -9,6 +9,8 @@ class CMetaBlock extends CBlock {
     int length;
     short attached_uid; // uid of the attached uid block
 
+    CUIDBlock uid_block;
+
     short nameLength; // not used outside
     short mimeTypeLength; // not used outside
 
@@ -53,5 +55,6 @@ class CMetaBlock extends CBlock {
 
     CMetaBlock() {
         b_type = CBlockType.Meta;
+        uid_block = new CUIDBlock();
     }
 }

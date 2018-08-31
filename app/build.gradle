@@ -10,10 +10,6 @@ android {
         versionCode 1
         versionName "1.0"
         testInstrumentationRunner "android.support.test.runner.AndroidJUnitRunner"
-
-        def documentsAuthorityValue = "com.ianhanniballake.localstorage.documents"
-        manifestPlaceholders = [documentsAuthority: documentsAuthorityValue]
-        buildConfigField "String", "DOCUMENTS_AUTHORITY", "\"${documentsAuthorityValue}\""
     }
     buildTypes {
         release {
@@ -32,6 +28,7 @@ dependencies {
     androidTestImplementation 'com.android.support.test:runner:1.0.2'
     androidTestImplementation 'com.android.support.test.espresso:espresso-core:3.0.2'
     implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk7:$kotlin_version"
+    implementation 'com.getkeepsafe.taptargetview:taptargetview:1.12.0'
 }
 repositories {
     mavenCentral()

@@ -1,12 +1,11 @@
 package com.writzx.filtranet;
 
 import java.io.FileDescriptor;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.LinkedList;
 
 public class CFile {
     CMetaBlock metaBlock;
-    List<CFileBlock> blocks = new ArrayList<>();
+    LinkedList<CFileBlock> blocks = new LinkedList<>();
 
     FileDescriptor fd;
     // should contain all other attribute data including path
@@ -14,5 +13,25 @@ public class CFile {
     CFile(FileDescriptor fd) {
         this.fd = fd;
         metaBlock = new CMetaBlock();
+    }
+
+    private CFile() {
+    }
+
+    public static CFile createNew() {
+        return new CFile();
+    }
+
+    void addBlock(CFileBlock block) {
+        blocks.add(block);
+        metaBlock.uid_block.addUID(block.uid);
+    }
+
+    void insertBlock(CFileBlock block, int index) {
+        blocks.add(index, block);
+    }
+
+    void removeBlock(int index) {
+        blocks.remove(index);
     }
 }

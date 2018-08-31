@@ -53,7 +53,7 @@ class CFileBlock extends CBlock {
 
         if (valid = valid(data)) {
             // the data is valid; write to temp block directory
-            try (FileOutputStream fos = MainActivity.context.get().openFileOutput("" + uid, Context.MODE_PRIVATE); DataOutputStream out = new DataOutputStream(fos)) {
+            try (FileOutputStream fos = FileListActivity.context.get().openFileOutput("" + uid, Context.MODE_PRIVATE); DataOutputStream out = new DataOutputStream(fos)) {
                 out.writeShort(uid);
 
                 out.writeLong(offset);
