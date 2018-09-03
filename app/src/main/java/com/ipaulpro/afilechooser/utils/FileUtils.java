@@ -530,20 +530,19 @@ public class FileUtils {
         return intent;
     }
 
-    public static Intent createOpenDocumentIntent() {
-        final Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
-
-        intent.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true);
-        intent.putExtra(Intent.EXTRA_LOCAL_ONLY, true);
-        intent.putExtra("android.content.extra.SHOW_ADVANCED", true);
-
-        intent.setType("*/*");
-
-        intent.addCategory(Intent.CATEGORY_OPENABLE);
-        return intent;
+    public static Intent newOpenDocumentIntent() {
+        return new Intent(Intent.ACTION_OPEN_DOCUMENT)
+                .setType("*/*")
+                .addCategory(Intent.CATEGORY_OPENABLE)
+                .putExtra(Intent.EXTRA_LOCAL_ONLY, true)
+                .putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
+                .putExtra("android.content.extra.SHOW_ADVANCED", true);
     }
 
-    public static Intent createOpenDocumentIntent(String fileName) {
-        return createOpenDocumentIntent().putExtra(Intent.EXTRA_TITLE, fileName);
+    public static Intent newCreateDocumentIntent(String fileName, String mime) {
+        return newOpenDocumentIntent()
+                .setType(mime)
+                .putExtra(Intent.EXTRA_TITLE, fileName)
+                .setAction(Intent.ACTION_CREATE_DOCUMENT);
     }
 }

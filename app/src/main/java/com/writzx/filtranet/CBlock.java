@@ -5,7 +5,7 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 
 public abstract class CBlock {
-    public static final int BLOCK_LENGTH = 1024;
+    public static final int MAX_BLOCK_LENGTH = 1024;
 
     public CBlockType b_type;
 

@@ -1,9 +1,9 @@
 package com.writzx.filtranet;
 
-import android.content.Context;
-
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
+import java.io.EOFException;
+import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
@@ -49,11 +49,15 @@ class CFileBlock extends CBlock {
         length = in.readInt();
 
         byte[] data = new byte[length];
-        in.read(data, 0, length);
+        if (in.read(data, 0, length) == -1) {
+            throw new EOFException("early end of block");
+        }
 
         if (valid = valid(data)) {
             // the data is valid; write to temp block directory
-            try (FileOutputStream fos = FileListActivity.context.get().openFileOutput("" + uid, Context.MODE_PRIVATE); DataOutputStream out = new DataOutputStream(fos)) {
+            File f = new File(MainActivity.receiveCache, "" + uid);
+            f.getParentFile().mkdirs();
+            try (FileOutputStream fos = new FileOutputStream(f, false); DataOutputStream out = new DataOutputStream(fos)) {
                 out.writeShort(uid);
 
                 out.writeLong(offset);

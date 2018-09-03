@@ -1,6 +1,6 @@
 package com.writzx.filtranet;
 
-public class ProgressListItem implements ListItem {
+public class ProgressItem implements ListItem {
     private String filename;
     private String filepath;
 
@@ -8,7 +8,7 @@ public class ProgressListItem implements ListItem {
     private int bytesRead;
     private int totalLength;
 
-    public ProgressListItem(String filename, String filepath) {
+    public ProgressItem(String filename, String filepath) {
         this.filename = filename;
         this.filepath = filepath;
     }

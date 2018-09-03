@@ -12,7 +12,6 @@ import android.support.design.widget.FloatingActionButton;
 import android.support.design.widget.Snackbar;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
-import android.text.TextUtils;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
@@ -24,16 +23,15 @@ import com.ipaulpro.afilechooser.utils.FileUtils;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.ref.WeakReference;
-import java.util.ArrayList;
 
 public class FileListActivity extends AppCompatActivity {
-    private static final int READ_REQUEST_CODE = 42;
-    private static final int WRITE_REQUEST_CODE = 43;
+    private static final int READ_REQUEST_CODE = 0xee14;
+    private static final int WRITE_REQUEST_CODE = 0xee15;
 
-//    private static final int RC_OPEN_READ = 2;
-//    private static final int RC_OPEN_WRITE = 2;
-//    private static final String LAST_RETURNED_DOCUMENT_URI = "LAST_RETURNED_DOCUMENT_URI";
-//    private static final String LAST_RETURNED_DOCUMENT_TREE_URI = "LAST_RETURNED_DOCUMENT_TREE_URI";
+    private static final String TAG = "Filtranet";
+
+    public static final String RESULT_KEY = "com.writzx.filtranet.RESULT_FITEM";
+    public static final String FILE_CREATE_MODE_KEY = "com.writzx.filtranet.OPEN_OR_CREATE";
 
     @IntDef({INDEFINITE_SNACK, SHORT_SNACK, LONG_SNACK})
     @Retention(RetentionPolicy.SOURCE)
@@ -44,21 +42,16 @@ public class FileListActivity extends AppCompatActivity {
     public static final int SHORT_SNACK = Snackbar.LENGTH_SHORT;
     public static final int LONG_SNACK = Snackbar.LENGTH_LONG;
 
-
-    private static final String TAG = "Filtranet";
-
     public static WeakReference<Context> context;
-
     public ListView fileListView;
-
-    public static FileItemAdapter adapter;
+    public boolean createMode = false;
 
     public void selectFileRead() {
-        startActivityForResult(FileUtils.createOpenDocumentIntent(), READ_REQUEST_CODE);
+        startActivityForResult(FileUtils.newOpenDocumentIntent(), READ_REQUEST_CODE);
     }
 
-    private void selectFileWrite(String fileName) {
-        startActivityForResult(FileUtils.createOpenDocumentIntent(fileName), WRITE_REQUEST_CODE);
+    private void selectFileWrite(String fileName, String type) {
+        startActivityForResult(FileUtils.newCreateDocumentIntent(fileName, type), WRITE_REQUEST_CODE);
     }
 
     @Override
@@ -71,30 +64,35 @@ public class FileListActivity extends AppCompatActivity {
         FloatingActionButton fab = findViewById(R.id.fab);
         fileListView = findViewById(R.id.fileListView);
 
+        createMode = getIntent().getBooleanExtra(FILE_CREATE_MODE_KEY, false);
+
         fab.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-//                selectFileWrite("fuckingFile.txt");
-//                selectFileRead();
-
                 selectFileRead();
             }
         });
 
-        // console = findViewById(R.id.console);
-
         context = new WeakReference<>((Context) this);
 
-        adapter = new FileItemAdapter(this, new ArrayList<ListItem>());
-
-        fileListView.setAdapter(adapter);
+        fileListView.setAdapter(MainActivity.adapter);
         fileListView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
             @Override
             public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
-                if (adapter.getItem(position).getType() == ListItem.TYPE_FILE) {
-                    MainActivity.item = (FileListItem) adapter.getItem(position);
-                    setResult(RESULT_OK);
-                    finish();
+                if (createMode) {
+                    // todo delete the file and create a new file at that location
+                } else {
+                    if (MainActivity.adapter.getItem(position).getType() == ListItem.TYPE_FILE) {
+                        FileItem fitem = (FileItem) MainActivity.adapter.getItem(position);
+
+                        if (fitem == null || fitem.getFile() == null) {
+                            // todo start file processor to process the file from uri if its present
+                            // todo else remove and show error
+                        }
+
+                        setResult(RESULT_OK, new Intent().putExtra(RESULT_KEY, fitem));
+                        finish();
+                    }
                 }
             }
         });
@@ -134,8 +132,8 @@ public class FileListActivity extends AppCompatActivity {
                             Uri[] uris = new Uri[cd.getItemCount()];
                             for (int i = 0; i < uris.length; i++) {
                                 uris[i] = cd.getItemAt(i).getUri();
-                                // todo handle multiple uri
-                                showSnackbar(TextUtils.join("\n", uris), LONG_SNACK);
+
+                                FileProcessor.create(uris[i]).executeOnExecutor(AsyncTask.SERIAL_EXECUTOR);
                             }
                         } else {
                             uri = resultData.getData();
@@ -147,11 +145,17 @@ public class FileListActivity extends AppCompatActivity {
                 break;
             case WRITE_REQUEST_CODE:
                 if (resultCode == Activity.RESULT_OK) {
+                    // file already created by the system
+
                     Uri uri = null;
                     if (resultData != null) {
+                        ClipData cd = resultData.getClipData();
+                        if (cd != null) {
+                            // error (cannot create multiple files at once.
+                            return;
+                        }
+
                         uri = resultData.getData();
-                        // Log.i(TAG, "Uri: " + uri.toString());
-                        // writeFile(uri);
                     }
                 }
                 break;

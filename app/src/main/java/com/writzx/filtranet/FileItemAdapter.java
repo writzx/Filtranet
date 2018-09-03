@@ -13,7 +13,6 @@ import android.widget.TextView;
 
 import com.ipaulpro.afilechooser.utils.FileUtils;
 
-import java.lang.ref.WeakReference;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
@@ -35,11 +34,8 @@ public class FileItemAdapter extends ArrayAdapter<ListItem> {
         private ProgressBar fileProgressBar;
     }
 
-    WeakReference<Context> context;
-
     public FileItemAdapter(@NonNull Context context, @NonNull List<ListItem> objects) {
         super(context, R.layout.file_list_item, objects);
-        this.context = new WeakReference<>(context);
     }
 
     @NonNull
@@ -50,7 +46,7 @@ public class FileItemAdapter extends ArrayAdapter<ListItem> {
         if (listitem != null) {
             switch (listitem.getType()) {
                 case ListItem.TYPE_FILE:
-                    FileListItem fileitem = (FileListItem) listitem;
+                    FileItem fileitem = (FileItem) listitem;
                     FileViewHolder fileViewHolder;
 
                     if (convertView == null) {
@@ -77,11 +73,11 @@ public class FileItemAdapter extends ArrayAdapter<ListItem> {
                         fileViewHolder.filepath.setText(fileitem.getPath());
                         fileViewHolder.filetype.setText(fileitem.getMimeType());
                         fileViewHolder.filesize.setText(FileUtils.getReadableFileSize(fileitem.getFileSize()));
-                        fileViewHolder.date_added.setText(FileListItem.dateformat.format(fileitem.getDateAdded()));
+                        fileViewHolder.date_added.setText(FileItem.dateformat.format(fileitem.getDateAdded()));
                     }
                     break;
                 case ListItem.TYPE_PROGRESS:
-                    ProgressListItem progressitem = (ProgressListItem) listitem;
+                    ProgressItem progressitem = (ProgressItem) listitem;
                     ProgressViewHolder progressViewHolder;
 
                     if (convertView == null) {
@@ -136,8 +132,8 @@ public class FileItemAdapter extends ArrayAdapter<ListItem> {
     public boolean contains(String filepath) {
         for (int i = 0; i < getCount(); i++) {
             ListItem li = getItem(i);
-            if ((li instanceof FileListItem && ((FileListItem) li).getPath().equals(filepath)) ||
-                    (li instanceof ProgressListItem && ((ProgressListItem) li).getFilePath().equals(filepath))) {
+            if ((li instanceof FileItem && ((FileItem) li).getPath().equals(filepath)) ||
+                    (li instanceof ProgressItem && ((ProgressItem) li).getFilePath().equals(filepath))) {
                 return true;
             }
         }

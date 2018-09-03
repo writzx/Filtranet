@@ -38,7 +38,7 @@ public class UDPReceiver implements Closeable {
         return str;
     }
 
-    public CBlock receive() throws IOException {
+    public BlockHolder receive() throws IOException {
         byte[] packetBytes = new byte[MAX_TRANSMISSION_UNIT];
         DatagramPacket packet = new DatagramPacket(packetBytes, packetBytes.length);
 
@@ -49,7 +49,7 @@ public class UDPReceiver implements Closeable {
             CBlock block = CBlock.factory(in);
             block.read(in);
 
-            return block;
+            return BlockHolder.of(packet.getAddress().getHostAddress(), block);
         }
     }
 

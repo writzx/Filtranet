@@ -27,13 +27,13 @@ public class UDPSender implements Closeable {
         return instance;
     }
 
-    public void send(String ip, CBlock block) throws IOException {
+    public void send(BlockHolder bh) throws IOException {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
 
-        out.write(new byte[]{block.b_type.value});
-        block.write(new DataOutputStream(out));
+        out.write(new byte[]{bh.block.b_type.value});
+        bh.block.write(new DataOutputStream(out));
 
-        DatagramPacket packet = new DatagramPacket(out.toByteArray(), out.size(), InetAddress.getByName(ip), RECV_PORT);
+        DatagramPacket packet = new DatagramPacket(out.toByteArray(), out.size(), InetAddress.getByName(bh.ip), RECV_PORT);
 
         socket.send(packet);
     }

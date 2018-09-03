@@ -1,11 +1,15 @@
 package com.writzx.filtranet;
 
 public class BlockHolder {
-    public String dest_ip;
+    public String ip;
     public CBlock block;
 
-    public BlockHolder(String dest_ip, CBlock block) {
-        this.dest_ip = dest_ip;
+    private BlockHolder(String ip, CBlock block) {
+        this.ip = ip;
         this.block = block;
+    }
+
+    public static BlockHolder of(String ip, CBlock block) {
+        return new BlockHolder(ip, block);
     }
 }
