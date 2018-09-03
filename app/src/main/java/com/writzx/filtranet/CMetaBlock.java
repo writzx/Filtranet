@@ -56,5 +56,6 @@ class CMetaBlock extends CBlock {
     CMetaBlock() {
         b_type = CBlockType.Meta;
         uid_block = new CUIDBlock();
+        attached_uid = uid_block.uid;
     }
 }

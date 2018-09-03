@@ -4,20 +4,21 @@ package com.writzx.filtranet;
 import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.Drawable;
 import android.net.Uri;
+import android.os.Parcel;
+import android.os.Parcelable;
 import android.support.v4.content.res.ResourcesCompat;
 
 import com.ipaulpro.afilechooser.utils.FileUtils;
 
 import java.io.File;
+import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Locale;
 
-public class FileListItem implements ListItem {
+public class FileItem implements ListItem, Parcelable {
     private Uri uri;
     private Uri iconUri;
-    private Drawable icon;
-    private CFile file;
 
     private String filename;
     private String path;
@@ -25,9 +26,12 @@ public class FileListItem implements ListItem {
     private Date dateadded;
     private String mimetype;
 
+    private Drawable icon;
+    private CFile file;
+
     public static final SimpleDateFormat dateformat = new SimpleDateFormat("d MMMM yyyy", Locale.getDefault());
 
-    public FileListItem(Uri uri, int filesize, Uri iconUri) {
+    public FileItem(Uri uri, int filesize, Uri iconUri) {
         File file = FileUtils.getFile(FileListActivity.context.get(), uri);
 
         this.file = null;
@@ -44,7 +48,7 @@ public class FileListItem implements ListItem {
         generateThumb();
     }
 
-    public FileListItem(CFile cfile, Uri uri, int filesize, Uri iconUri) {
+    public FileItem(CFile cfile, Uri uri, int filesize, Uri iconUri) {
         File file = FileUtils.getFile(FileListActivity.context.get(), uri);
 
         this.file = cfile;
@@ -61,7 +65,7 @@ public class FileListItem implements ListItem {
         generateThumb();
     }
 
-    public FileListItem(CFile cfile, Uri uri, int filesize) {
+    public FileItem(CFile cfile, Uri uri, int filesize) {
         File file = FileUtils.getFile(FileListActivity.context.get(), uri);
 
         this.file = cfile;
@@ -76,6 +80,51 @@ public class FileListItem implements ListItem {
 
         generateThumb();
     }
+
+    protected FileItem(Parcel in) {
+        uri = in.readParcelable(Uri.class.getClassLoader());
+        iconUri = in.readParcelable(Uri.class.getClassLoader());
+        filename = in.readString();
+        path = in.readString();
+        filesize = in.readInt();
+        try {
+            dateadded = dateformat.parse(in.readString());
+        } catch (ParseException e) {
+            dateadded = new Date(System.currentTimeMillis());
+        }
+        mimetype = in.readString();
+    }
+
+    @Override
+    public void writeToParcel(Parcel dest, int flags) {
+        dest.writeParcelable(uri, flags);
+        dest.writeParcelable(iconUri, flags);
+        dest.writeString(filename);
+        dest.writeString(path);
+        dest.writeInt(filesize);
+
+        if (dateadded == null) dateadded = new Date(System.currentTimeMillis());
+
+        dest.writeString(dateformat.format(dateadded));
+        dest.writeString(mimetype);
+    }
+
+    @Override
+    public int describeContents() {
+        return 0;
+    }
+
+    public static final Creator<FileItem> CREATOR = new Creator<FileItem>() {
+        @Override
+        public FileItem createFromParcel(Parcel in) {
+            return new FileItem(in);
+        }
+
+        @Override
+        public FileItem[] newArray(int size) {
+            return new FileItem[size];
+        }
+    };
 
     public String getFileName() {
         return filename;
