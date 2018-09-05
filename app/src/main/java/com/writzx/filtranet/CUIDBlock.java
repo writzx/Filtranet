@@ -1,6 +1,9 @@
 package com.writzx.filtranet;
 
-import com.google.common.primitives.Shorts;
+import android.os.Parcel;
+import android.os.Parcelable;
+
+import com.google.common.primitives.Ints;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
@@ -14,32 +17,68 @@ import java.nio.ByteOrder;
 import java.util.ArrayList;
 import java.util.List;
 
-class CUIDBlock extends CBlock {
-    public static final int MAX_UIDS_PER_BLOCK = 500;
+class CUIDBlock extends CBlock implements Parcelable {
+    public static final int MAX_UIDS_PER_BLOCK = 256;
 
-    short uid;
+    int uid;
     int length; // number of bytes occupied by the next field, i.e., UIDs array.
 
-    List<Short> uids = new ArrayList<>();
+    List<Integer> uids = new ArrayList<>();
 
-    short next_uid = 0; // uid of the next uid block; same as uid if none (0)
+    int next_uid = 0; // uid of the next uid block; same as uid if none (0)
 
     CUIDBlock next;
 
+    protected CUIDBlock(Parcel in) {
+        super(in);
+        uid = in.readInt();
+        length = in.readInt();
+        in.readList(uids, Integer.class.getClassLoader());
+        next_uid = in.readInt();
+        next = in.readParcelable(CUIDBlock.class.getClassLoader());
+    }
+
+    @Override
+    public void writeToParcel(Parcel dest, int flags) {
+        super.writeToParcel(dest, flags);
+        dest.writeInt(uid);
+        dest.writeInt(length);
+        dest.writeList(uids);
+        dest.writeInt(next_uid);
+        dest.writeParcelable(next, flags);
+    }
+
+    @Override
+    public int describeContents() {
+        return 0;
+    }
+
+    public static final Creator<CUIDBlock> CREATOR = new Creator<CUIDBlock>() {
+        @Override
+        public CUIDBlock createFromParcel(Parcel in) {
+            return new CUIDBlock(in);
+        }
+
+        @Override
+        public CUIDBlock[] newArray(int size) {
+            return new CUIDBlock[size];
+        }
+    };
+
     @Override
     public void read(DataInputStream in) throws IOException {
-        uid = in.readShort();
+        uid = in.readInt();
         length = in.readInt();
 
         byte[] _uids = new byte[length];
         in.read(_uids, 0, length);
 
-        short[] s_uids = new short[length / 2];
-        ByteBuffer.wrap(_uids).order(ByteOrder.LITTLE_ENDIAN).asShortBuffer().get(s_uids);
+        int[] s_uids = new int[length / 4];
+        ByteBuffer.wrap(_uids).order(ByteOrder.LITTLE_ENDIAN).asIntBuffer().get(s_uids);
 
-        uids = Shorts.asList(s_uids);
+        uids = Ints.asList(s_uids);
 
-        next_uid = in.readShort();
+        next_uid = in.readInt();
 
         if (next_uid != uid) {
             next = new CUIDBlock(next_uid);
@@ -50,31 +89,31 @@ class CUIDBlock extends CBlock {
 
     @Override
     public void write(DataOutputStream out) throws IOException {
-        out.writeShort(uid);
-        length = uids.size() * 2;
+        out.writeInt(uid);
+        length = uids.size() * 4;
         out.writeInt(length);
 
         byte[] _uids = new byte[length];
-        ByteBuffer.wrap(_uids).order(ByteOrder.LITTLE_ENDIAN).asShortBuffer().put(Shorts.toArray(uids));
+        ByteBuffer.wrap(_uids).order(ByteOrder.LITTLE_ENDIAN).asIntBuffer().put(Ints.toArray(uids));
 
         out.write(_uids, 0, length);
 
         if (next == null && next_uid == 0) next_uid = uid;
-        out.writeShort(next_uid);
+        out.writeInt(next_uid);
     }
 
     CUIDBlock() {
-        b_type = CBlockType.UID;
+        this(UID.generate());
     }
 
-    CUIDBlock(short uid) {
+    CUIDBlock(int uid) {
         b_type = CBlockType.UID;
         this.uid = uid;
         this.next_uid = uid;
     }
 
     public static void save(CUIDBlock block, String path) throws IOException {
-        File file = new File(path + File.separator + block.uid);
+        File file = new File(path, Utils.toHex(block.uid));
         file.getParentFile().mkdirs();
 
         try (FileOutputStream fos = new FileOutputStream(file, false); DataOutputStream dos = new DataOutputStream(fos)) {
@@ -83,8 +122,8 @@ class CUIDBlock extends CBlock {
         }
     }
 
-    public static CUIDBlock open(String path, short uid) throws IOException {
-        File file = new File(path + File.separator + uid);
+    public static CUIDBlock open(String path, int uid) throws IOException {
+        File file = new File(path, Utils.toHex(uid));
 
         if (!file.exists()) throw new FileNotFoundException();
 
@@ -100,7 +139,7 @@ class CUIDBlock extends CBlock {
         }
     }
 
-    void addUID(short uid) {
+    void addUID(int uid) {
         if (uids.size() < MAX_UIDS_PER_BLOCK) {
             uids.add(uid);
         } else {
@@ -113,19 +152,17 @@ class CUIDBlock extends CBlock {
         }
     }
 
-    void removeUID(short uid) {
-        int ind = uids.indexOf(uid);
-        if (ind != -1) {
-            uids.remove(ind);
-        } else {
-            if (next != null) {
-                next.removeUID(uid);
-            }
+    void removeUID(int uid) {
+        if (!uids.remove(Integer.valueOf(uid)) && next != null) {
+            next.removeUID(uid);
         }
     }
 
-    void setUid(short uid) {
+    void setUid(int uid) {
         this.uid = uid;
+    }
+
+    void setNextUid(int uid) {
         this.next_uid = uid;
     }
 }

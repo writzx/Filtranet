@@ -80,7 +80,7 @@ public class FileListActivity extends AppCompatActivity {
             @Override
             public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
                 if (createMode) {
-                    // todo delete the file and create a new file at that location
+                    // cannot overwrite existing file
                 } else {
                     if (MainActivity.adapter.getItem(position).getType() == ListItem.TYPE_FILE) {
                         FileItem fitem = (FileItem) MainActivity.adapter.getItem(position);

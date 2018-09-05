@@ -1,11 +1,15 @@
 package com.writzx.filtranet;
 
-import java.io.FileDescriptor;
-import java.util.LinkedList;
+import android.os.Parcel;
+import android.os.Parcelable;
 
-public class CFile {
+import java.io.FileDescriptor;
+import java.util.ArrayList;
+import java.util.List;
+
+public class CFile implements Parcelable {
     CMetaBlock metaBlock;
-    LinkedList<CFileBlock> blocks = new LinkedList<>();
+    List<CFileBlock> blocks = new ArrayList<>();
 
     FileDescriptor fd;
     // should contain all other attribute data including path
@@ -18,6 +22,34 @@ public class CFile {
     private CFile() {
     }
 
+    protected CFile(Parcel in) {
+        metaBlock = in.readParcelable(CMetaBlock.class.getClassLoader());
+        in.readTypedList(blocks, CFileBlock.CREATOR);
+    }
+
+    @Override
+    public void writeToParcel(Parcel dest, int flags) {
+        dest.writeParcelable(metaBlock, flags);
+        dest.writeTypedList(blocks);
+    }
+
+    @Override
+    public int describeContents() {
+        return 0;
+    }
+
+    public static final Creator<CFile> CREATOR = new Creator<CFile>() {
+        @Override
+        public CFile createFromParcel(Parcel in) {
+            return new CFile(in);
+        }
+
+        @Override
+        public CFile[] newArray(int size) {
+            return new CFile[size];
+        }
+    };
+
     public static CFile createNew() {
         return new CFile();
     }
@@ -27,11 +59,8 @@ public class CFile {
         metaBlock.uid_block.addUID(block.uid);
     }
 
-    void insertBlock(CFileBlock block, int index) {
-        blocks.add(index, block);
-    }
-
     void removeBlock(int index) {
-        blocks.remove(index);
+        CFileBlock blk = blocks.remove(index);
+        metaBlock.uid_block.removeUID(blk.uid);
     }
 }

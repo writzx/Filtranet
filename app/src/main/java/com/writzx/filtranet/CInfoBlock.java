@@ -1,5 +1,8 @@
 package com.writzx.filtranet;
 
+import android.os.Parcel;
+import android.os.Parcelable;
+
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
@@ -7,15 +10,54 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 
-class CInfoBlock extends CBlock {
+class CInfoBlock extends CBlock implements Parcelable {
     public final static int INFO_ACK = 69;
     public final static int INFO_NACK = 70;
 
     int length; // number of bytes occupied by the next field, i.e., UIDs array.
-    short[] uids; // uid of the attached block
+    int[] uids; // uid of the attached block
     int info_code;
     int messageLength; // not to be used outside of this class
     String message;
+
+    protected CInfoBlock(Parcel in) {
+        super(in);
+        length = in.readInt();
+
+        uids = new int[length / 4];
+        in.readIntArray(uids);
+
+        info_code = in.readInt();
+        messageLength = in.readInt();
+        message = in.readString();
+    }
+
+    @Override
+    public void writeToParcel(Parcel dest, int flags) {
+        super.writeToParcel(dest, flags);
+        dest.writeInt(length);
+        dest.writeIntArray(uids);
+        dest.writeInt(info_code);
+        dest.writeInt(messageLength);
+        dest.writeString(message);
+    }
+
+    @Override
+    public int describeContents() {
+        return 0;
+    }
+
+    public static final Creator<CInfoBlock> CREATOR = new Creator<CInfoBlock>() {
+        @Override
+        public CInfoBlock createFromParcel(Parcel in) {
+            return new CInfoBlock(in);
+        }
+
+        @Override
+        public CInfoBlock[] newArray(int size) {
+            return new CInfoBlock[size];
+        }
+    };
 
     @Override
     public void read(DataInputStream in) throws IOException {
@@ -24,8 +66,8 @@ class CInfoBlock extends CBlock {
         byte[] _uids = new byte[length];
         in.read(_uids, 0, length);
 
-        uids = new short[length / 2];
-        ByteBuffer.wrap(_uids).order(ByteOrder.LITTLE_ENDIAN).asShortBuffer().get(uids);
+        uids = new int[length / 4];
+        ByteBuffer.wrap(_uids).order(ByteOrder.LITTLE_ENDIAN).asIntBuffer().get(uids);
 
         info_code = in.readInt();
         messageLength = in.readInt();
@@ -38,11 +80,11 @@ class CInfoBlock extends CBlock {
 
     @Override
     public void write(DataOutputStream out) throws IOException {
-        length = uids.length * 2;
+        length = uids.length * 4;
         out.writeInt(length);
 
         byte[] _uids = new byte[length];
-        ByteBuffer.wrap(_uids).order(ByteOrder.LITTLE_ENDIAN).asShortBuffer().put(uids);
+        ByteBuffer.wrap(_uids).order(ByteOrder.LITTLE_ENDIAN).asIntBuffer().put(uids);
 
         out.write(_uids, 0, length);
 

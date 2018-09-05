@@ -1,28 +1,29 @@
 package com.writzx.filtranet;
 
-import com.google.common.primitives.Shorts;
+import com.google.common.primitives.Ints;
 
 import java.io.DataInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.TreeSet;
 import java.util.concurrent.LinkedBlockingQueue;
 
 public class BlockSender implements Runnable {
     private Thread thread;
+
     private final LinkedBlockingQueue<BlockHolder> queue;
-    // do not need ip for this since will be sent to any ip address which requests the block
-    private final TreeSet<Short> blockUIDs;
+    private final List<CFileBlock> fileBlocks;
+
     public final LinkedBlockingQueue<BlockHolder> localBlocks = new LinkedBlockingQueue<>();
 
     private boolean started = false;
 
     public BlockSender() {
         this.queue = new LinkedBlockingQueue<>();
-        this.blockUIDs = new TreeSet<>();
+        this.fileBlocks = new ArrayList<>();
         thread = new Thread(this);
     }
 
@@ -54,19 +55,7 @@ public class BlockSender implements Runnable {
         // only add the meta block and wait for requests
         queue.put(BlockHolder.of(ip, file.metaBlock));
 
-        blockUIDs.add(file.metaBlock.attached_uid);
-
-        // do recursive add of block uids
-        CUIDBlock ublk = file.metaBlock.uid_block != null ? file.metaBlock.uid_block : CUIDBlock.open(MainActivity.sendCache, file.metaBlock.attached_uid);
-
-        do {
-            CUIDBlock.save(ublk, MainActivity.sendCache);
-            blockUIDs.add(ublk.uid);
-        } while ((ublk = ublk.next) != null);
-
-        for (CFileBlock block : file.blocks) {
-            blockUIDs.add(block.uid);
-        }
+        fileBlocks.addAll(file.blocks);
     }
 
     public void queueBlock(BlockHolder bh) throws InterruptedException, IOException {
@@ -85,9 +74,10 @@ public class BlockSender implements Runnable {
         }
     }
 
-    public void queueUIDBlock(String ip, short uid) throws IOException, InterruptedException {
+    public void queueUIDBlock(String ip, int uid) throws IOException, InterruptedException {
         try {
-            if (!blockUIDs.contains(uid)) {
+            File uid_file = new File(MainActivity.sendCache, Utils.toHex(uid));
+            if (!uid_file.exists()) {
                 respondBlockFail(ip, uid);
                 return;
             }
@@ -99,7 +89,24 @@ public class BlockSender implements Runnable {
         }
     }
 
-    public void requestFileBlock(String ip, boolean nack, short... uids) {
+    public void queueFileBlock(String ip, int uid) throws IOException, InterruptedException {
+        CFileBlock bk = findFileBlock(uid);
+        if (bk == null) {
+            respondBlockFail(ip, uid);
+            return;
+        }
+
+        queue.put(BlockHolder.of(ip, bk));
+    }
+
+    public CFileBlock findFileBlock(int uid) {
+        for (CFileBlock blk : fileBlocks) {
+            if (blk.valid && blk.uid == uid) return blk;
+        }
+        return null;
+    }
+
+    public void requestFileBlock(String ip, boolean nack, int... uids) throws IOException, InterruptedException {
         if (nack) {
             CInfoBlock infBlock = new CInfoBlock();
             infBlock.info_code = CInfoBlock.INFO_NACK;
@@ -107,86 +114,50 @@ public class BlockSender implements Runnable {
 
             infBlock.message = "CFileBlock";
 
-            while (true) {
-                try {
-                    queueBlock(BlockHolder.of(ip, infBlock));
-                    break;
-                } catch (InterruptedException | IOException e) {
-                    e.printStackTrace();
-                }
-            }
+            queueBlock(BlockHolder.of(ip, infBlock));
+
         } else {
-            List<Short> uid_s = Shorts.asList(uids);
-            for (short uid : uids) {
+            List<Integer> uid_s = new ArrayList<>(Ints.asList(uids));
+            for (int uid : uids) {
                 CBlock b = getLocal(uid, CBlockType.File);
                 if (b == null) {
                     uid_s.add(uid);
                 } else {
-                    while (true) {
-                        try {
-                            localBlocks.put(BlockHolder.of(ip, b));
-                            break;
-                        } catch (InterruptedException e) {
-                            e.printStackTrace();
-                        }
-                    }
+                    localBlocks.put(BlockHolder.of(ip, b));
                 }
             }
 
             CInfoBlock infBlock = new CInfoBlock();
             infBlock.info_code = CInfoBlock.INFO_ACK;
-            infBlock.uids = Shorts.toArray(uid_s);
+            infBlock.uids = Ints.toArray(uid_s);
 
             infBlock.message = "CFileBlock";
 
-            while (true) {
-                try {
-                    queueBlock(BlockHolder.of(ip, infBlock));
-                    break;
-                } catch (InterruptedException | IOException e) {
-                    e.printStackTrace();
-                }
-            }
+            queueBlock(BlockHolder.of(ip, infBlock));
         }
     }
 
-    public void requestUIDBlock(String ip, short... uids) {
-        while (true) {
-            List<Short> uid_s = Shorts.asList(uids);
-            for (short uid : uids) {
-                CBlock b = getLocal(uid, CBlockType.UID);
-                if (b == null) {
-                    uid_s.add(uid);
-                } else {
-                    while (true) {
-                        try {
-                            localBlocks.put(BlockHolder.of(ip, b));
-                            break;
-                        } catch (InterruptedException e) {
-                            e.printStackTrace();
-                        }
-                    }
-                }
-            }
-
-            CInfoBlock infBlock = new CInfoBlock();
-            infBlock.info_code = CInfoBlock.INFO_ACK;
-            infBlock.uids = Shorts.toArray(uid_s);
-
-            infBlock.message = "CUIDBlock";
-
-            while (true) {
-                try {
-                    queueBlock(BlockHolder.of(ip, infBlock));
-                    break;
-                } catch (InterruptedException | IOException e) {
-                    e.printStackTrace();
-                }
+    public void requestUIDBlock(String ip, int... uids) throws IOException, InterruptedException {
+        List<Integer> uid_s = new ArrayList<>(Ints.asList(uids));
+        for (int uid : uids) {
+            CBlock b = getLocal(uid, CBlockType.UID);
+            if (b != null) {
+                localBlocks.put(BlockHolder.of(ip, b));
+                uid_s.remove(Integer.valueOf(uid));
             }
         }
+
+        CInfoBlock infBlock = new CInfoBlock();
+        infBlock.info_code = CInfoBlock.INFO_ACK;
+        infBlock.uids = Ints.toArray(uid_s);
+
+        infBlock.message = "CUIDBlock";
+
+        queueBlock(BlockHolder.of(ip, infBlock));
+
     }
 
-    public void respondBlockFail(String ip, short... uid) throws IOException, InterruptedException {
+    public void respondBlockFail(String ip, int... uid) throws IOException, InterruptedException {
         CInfoBlock infBlock = new CInfoBlock();
         infBlock.info_code = CInfoBlock.INFO_NACK;
         infBlock.uids = uid;
@@ -196,8 +167,8 @@ public class BlockSender implements Runnable {
         queueBlock(BlockHolder.of(ip, infBlock));
     }
 
-    public CBlock getLocal(short uid, CBlockType type) {
-        File f = new File(MainActivity.receiveCache, uid + "");
+    public CBlock getLocal(int uid, CBlockType type) {
+        File f = new File(MainActivity.receiveCache, Utils.toHex(uid));
         try (FileInputStream fis = new FileInputStream(f); DataInputStream din = new DataInputStream(fis)) {
             CBlock blk = CBlock.factory(din);
 
@@ -209,8 +180,7 @@ public class BlockSender implements Runnable {
             blk.read(din);
 
             return blk;
-        } catch (IOException e) {
-            e.printStackTrace();
+        } catch (IOException ignored) {
         }
         return null;
     }

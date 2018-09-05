@@ -68,6 +68,14 @@ public class FileProcessor extends AsyncTask<Void, Integer, FileItem> {
                 publishProgress(len, totalLen);
             }
 
+
+            // save the uid blocks in send cache
+            CUIDBlock ublk = cfile.metaBlock.uid_block;
+
+            do {
+                CUIDBlock.save(ublk, MainActivity.sendCache);
+            } while ((ublk = ublk.next) != null);
+
             return isCancelled() ? null : new FileItem(cfile, uri, totalLen);
         } catch (IOException ex) {
             Log.e(TAG, "URI Error: Could not resolve stream!");

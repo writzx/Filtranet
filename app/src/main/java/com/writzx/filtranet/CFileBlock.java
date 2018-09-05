@@ -1,5 +1,8 @@
 package com.writzx.filtranet;
 
+import android.os.Parcel;
+import android.os.Parcelable;
+
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.EOFException;
@@ -9,15 +12,51 @@ import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 
-class CFileBlock extends CBlock {
-    short uid;
-    long offset;
+public class CFileBlock extends CBlock implements Parcelable {
+    int uid;
+    int offset;
     short crc;
     int length;
 
     boolean valid = true;
 
     CFile cfile;
+
+    protected CFileBlock(Parcel in) {
+        super(in);
+        uid = in.readInt();
+        offset = in.readInt();
+        crc = (short) in.readInt();
+        length = in.readInt();
+        valid = in.readByte() != 0;
+    }
+
+    @Override
+    public void writeToParcel(Parcel dest, int flags) {
+        super.writeToParcel(dest, flags);
+        dest.writeInt(uid);
+        dest.writeInt(offset);
+        dest.writeInt((int) crc);
+        dest.writeInt(length);
+        dest.writeByte((byte) (valid ? 1 : 0));
+    }
+
+    @Override
+    public int describeContents() {
+        return 0;
+    }
+
+    public static final Creator<CFileBlock> CREATOR = new Creator<CFileBlock>() {
+        @Override
+        public CFileBlock createFromParcel(Parcel in) {
+            return new CFileBlock(in);
+        }
+
+        @Override
+        public CFileBlock[] newArray(int size) {
+            return new CFileBlock[size];
+        }
+    };
 
     @Override
     public void write(DataOutputStream out) throws IOException {
@@ -31,9 +70,9 @@ class CFileBlock extends CBlock {
             fis.read(data, 0, length);
         }
 
-        out.writeShort(uid);
+        out.writeInt(uid);
 
-        out.writeLong(offset);
+        out.writeInt(offset);
         out.writeShort(crc);
         out.writeInt(length);
 
@@ -42,9 +81,9 @@ class CFileBlock extends CBlock {
 
     @Override
     public void read(DataInputStream in) throws IOException {
-        uid = in.readShort();
+        uid = in.readInt();
 
-        offset = in.readLong();
+        offset = in.readInt();
         crc = in.readShort();
         length = in.readInt();
 
@@ -55,12 +94,12 @@ class CFileBlock extends CBlock {
 
         if (valid = valid(data)) {
             // the data is valid; write to temp block directory
-            File f = new File(MainActivity.receiveCache, "" + uid);
+            File f = new File(MainActivity.receiveCache, Utils.toHex(uid));
             f.getParentFile().mkdirs();
             try (FileOutputStream fos = new FileOutputStream(f, false); DataOutputStream out = new DataOutputStream(fos)) {
-                out.writeShort(uid);
+                out.writeInt(uid);
 
-                out.writeLong(offset);
+                out.writeInt(offset);
                 out.writeShort(crc);
                 out.writeLong(length);
 

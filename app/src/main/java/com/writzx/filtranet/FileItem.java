@@ -87,12 +87,13 @@ public class FileItem implements ListItem, Parcelable {
         filename = in.readString();
         path = in.readString();
         filesize = in.readInt();
+        mimetype = in.readString();
         try {
             dateadded = dateformat.parse(in.readString());
         } catch (ParseException e) {
             dateadded = new Date(System.currentTimeMillis());
         }
-        mimetype = in.readString();
+        file = in.readParcelable(CFile.class.getClassLoader());
     }
 
     @Override
@@ -102,11 +103,9 @@ public class FileItem implements ListItem, Parcelable {
         dest.writeString(filename);
         dest.writeString(path);
         dest.writeInt(filesize);
-
-        if (dateadded == null) dateadded = new Date(System.currentTimeMillis());
-
-        dest.writeString(dateformat.format(dateadded));
         dest.writeString(mimetype);
+        dest.writeString(dateformat.format(dateadded));
+        dest.writeParcelable(file, flags);
     }
 
     @Override
