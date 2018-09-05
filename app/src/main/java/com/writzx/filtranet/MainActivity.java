@@ -242,7 +242,7 @@ public class MainActivity extends AppCompatActivity {
 
                     try {
                         sender.queueFile(ip, p.getFile());
-                    } catch (InterruptedException | IOException e) {
+                    } catch (InterruptedException e) {
                         e.printStackTrace();
                     }
                     break;

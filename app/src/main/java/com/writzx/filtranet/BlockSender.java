@@ -51,7 +51,7 @@ public class BlockSender implements Runnable {
         started = false;
     }
 
-    public void queueFile(String ip, CFile file) throws InterruptedException, IOException {
+    public void queueFile(String ip, CFile file) throws InterruptedException {
         // only add the meta block and wait for requests
         queue.put(BlockHolder.of(ip, file.metaBlock));
 
@@ -120,10 +120,9 @@ public class BlockSender implements Runnable {
             List<Integer> uid_s = new ArrayList<>(Ints.asList(uids));
             for (int uid : uids) {
                 CBlock b = getLocal(uid, CBlockType.File);
-                if (b == null) {
-                    uid_s.add(uid);
-                } else {
+                if (b != null) {
                     localBlocks.put(BlockHolder.of(ip, b));
+                    uid_s.remove(Integer.valueOf(uid));
                 }
             }
 

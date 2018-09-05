@@ -31,7 +31,7 @@ public class FileItem implements ListItem, Parcelable {
 
     public static final SimpleDateFormat dateformat = new SimpleDateFormat("d MMMM yyyy", Locale.getDefault());
 
-    public FileItem(Uri uri, int filesize, Uri iconUri) {
+    /*public FileItem(Uri uri, int filesize, Uri iconUri) {
         File file = FileUtils.getFile(FileListActivity.context.get(), uri);
 
         this.file = null;
@@ -46,7 +46,7 @@ public class FileItem implements ListItem, Parcelable {
         prepMetaBlock();
 
         generateThumb();
-    }
+    }*/
 
     public FileItem(CFile cfile, Uri uri, int filesize, Uri iconUri) {
         File file = FileUtils.getFile(FileListActivity.context.get(), uri);
@@ -63,6 +63,8 @@ public class FileItem implements ListItem, Parcelable {
         prepMetaBlock();
 
         generateThumb();
+
+        fixRefs();
     }
 
     public FileItem(CFile cfile, Uri uri, int filesize) {
@@ -79,6 +81,8 @@ public class FileItem implements ListItem, Parcelable {
         prepMetaBlock();
 
         generateThumb();
+
+        fixRefs();
     }
 
     protected FileItem(Parcel in) {
@@ -94,6 +98,8 @@ public class FileItem implements ListItem, Parcelable {
             dateadded = new Date(System.currentTimeMillis());
         }
         file = in.readParcelable(CFile.class.getClassLoader());
+
+        fixRefs();
     }
 
     @Override
@@ -190,5 +196,14 @@ public class FileItem implements ListItem, Parcelable {
     @Override
     public int getType() {
         return ListItem.TYPE_FILE;
+    }
+
+    public void fixRefs() {
+        if (file != null) {
+            file.uri = uri;
+            for (CFileBlock fb : file.blocks) {
+                fb.cfile = file;
+            }
+        }
     }
 }

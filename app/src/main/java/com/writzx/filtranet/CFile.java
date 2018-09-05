@@ -1,21 +1,20 @@
 package com.writzx.filtranet;
 
+import android.net.Uri;
 import android.os.Parcel;
 import android.os.Parcelable;
 
-import java.io.FileDescriptor;
 import java.util.ArrayList;
 import java.util.List;
 
 public class CFile implements Parcelable {
     CMetaBlock metaBlock;
     List<CFileBlock> blocks = new ArrayList<>();
-
-    FileDescriptor fd;
+    Uri uri;
     // should contain all other attribute data including path
 
-    CFile(FileDescriptor fd) {
-        this.fd = fd;
+    CFile(Uri uri) {
+        this.uri = uri;
         metaBlock = new CMetaBlock();
     }
 

@@ -1,6 +1,8 @@
 package com.writzx.filtranet;
 
+import android.content.ContentResolver;
 import android.os.Parcel;
+import android.os.ParcelFileDescriptor;
 import android.os.Parcelable;
 
 import java.io.DataInputStream;
@@ -60,12 +62,19 @@ public class CFileBlock extends CBlock implements Parcelable {
 
     @Override
     public void write(DataOutputStream out) throws IOException {
-        if (cfile == null || cfile.fd == null || !cfile.fd.valid())
+        if (cfile == null) {
             throw new FileNotFoundException();
+        }
+
+        ContentResolver resolver = FileListActivity.context.get().getContentResolver();
+        ParcelFileDescriptor pfd = resolver.openFileDescriptor(cfile.uri, "r");
+        if (pfd == null) {
+            throw new FileNotFoundException();
+        }
 
         byte[] data = new byte[length];
 
-        try (FileInputStream fis = new FileInputStream(cfile.fd)) {
+        try (FileInputStream fis = new FileInputStream(pfd.getFileDescriptor())) {
             fis.skip(offset);
             fis.read(data, 0, length);
         }

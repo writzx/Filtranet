@@ -43,7 +43,7 @@ public class FileProcessor extends AsyncTask<Void, Integer, FileItem> {
             FileInputStream fis = new FileInputStream(pfd.getFileDescriptor());
             int totalLen = fis.available();
 
-            CFile cfile = new CFile(fis.getFD());
+            CFile cfile = new CFile(uri);
 
             int bytesRead, len;
 
@@ -67,7 +67,6 @@ public class FileProcessor extends AsyncTask<Void, Integer, FileItem> {
 
                 publishProgress(len, totalLen);
             }
-
 
             // save the uid blocks in send cache
             CUIDBlock ublk = cfile.metaBlock.uid_block;
